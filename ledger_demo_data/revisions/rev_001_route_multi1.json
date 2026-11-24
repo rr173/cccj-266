@@ -1,0 +1,8 @@
+{
+  "revision_id": "REV-001",
+  "kind": "manual_routing",
+  "item_id": "ITEM-MULTI-1",
+  "action": "replace",
+  "new_leaf": "N_M1",
+  "note": "合成：逐件指定已核准去向"
+}

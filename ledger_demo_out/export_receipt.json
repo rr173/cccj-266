@@ -1,0 +1,8 @@
+{
+  "outdir": "/workspace/ledger_demo_out/current",
+  "migrated": 3,
+  "pending": 8,
+  "migrated_items_file": "/workspace/ledger_demo_out/current/migrated_items.jsonl",
+  "pending_items_file": "/workspace/ledger_demo_out/current/pending_items.jsonl",
+  "summary_file": "/workspace/ledger_demo_out/current/summary.json"
+}

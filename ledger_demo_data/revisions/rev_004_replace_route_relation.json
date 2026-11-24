@@ -1,0 +1,16 @@
+{
+  "revision_id": "REV-004",
+  "kind": "old_leaf_destinations",
+  "old_leaf": "O_ROUTE",
+  "complete": true,
+  "destinations": [
+    {
+      "new_leaf": "N_R2",
+      "approved": true
+    },
+    {
+      "new_leaf": "N_R3",
+      "approved": true
+    }
+  ]
+}

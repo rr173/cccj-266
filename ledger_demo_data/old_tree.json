@@ -1,0 +1,45 @@
+{
+  "root": "OROOT",
+  "nodes": {
+    "OROOT": {
+      "parent": null,
+      "leaf": false,
+      "name": "OROOT 根"
+    },
+    "O_AUTO": {
+      "parent": "OROOT",
+      "leaf": true,
+      "name": "唯一核准去向"
+    },
+    "O_MULTI": {
+      "parent": "OROOT",
+      "leaf": true,
+      "name": "多个核准去向"
+    },
+    "O_WITHDRAW": {
+      "parent": "OROOT",
+      "leaf": true,
+      "name": "将被撤回核准"
+    },
+    "O_ROUTE": {
+      "parent": "OROOT",
+      "leaf": true,
+      "name": "分流目标将因关系替换消失"
+    },
+    "O_INCOMPLETE": {
+      "parent": "OROOT",
+      "leaf": true,
+      "name": "去向未列全"
+    },
+    "O_NONE": {
+      "parent": "OROOT",
+      "leaf": true,
+      "name": "列全但确认无去向"
+    },
+    "O_UNAPPROVED": {
+      "parent": "OROOT",
+      "leaf": true,
+      "name": "含未核准边"
+    }
+  }
+}

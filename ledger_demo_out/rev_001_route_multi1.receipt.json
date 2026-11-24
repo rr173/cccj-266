@@ -1,0 +1,22 @@
+{
+  "revision_id": "REV-001",
+  "idempotent_replay": false,
+  "applied": true,
+  "kind": "manual_routing",
+  "target_type": "item_id",
+  "target_id": "ITEM-MULTI-1",
+  "applied_at": "2026-11-24T18:38:12.258627+00:00",
+  "old_leaf": "O_MULTI",
+  "affected_item_count": 1,
+  "changed_item_count": 1,
+  "unchanged_item_count": 0,
+  "change_kind_counts": {
+    "pending_to_migrated": 1
+  },
+  "after_status_among_affected": {
+    "migrated": 1,
+    "pending": 0
+  },
+  "diff_file": "/workspace/ledger_demo_out/rev_001_route_multi1.diff.jsonl",
+  "diff_file_change_count": 1
+}

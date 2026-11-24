@@ -1,0 +1,21 @@
+{
+  "revision_id": "REV-003",
+  "idempotent_replay": false,
+  "applied": true,
+  "kind": "old_leaf_destinations",
+  "target_type": "old_leaf",
+  "target_id": "O_WITHDRAW",
+  "applied_at": "2026-11-24T18:38:12.425344+00:00",
+  "affected_item_count": 2,
+  "changed_item_count": 2,
+  "unchanged_item_count": 0,
+  "change_kind_counts": {
+    "migrated_to_pending": 2
+  },
+  "after_status_among_affected": {
+    "migrated": 0,
+    "pending": 2
+  },
+  "diff_file": "/workspace/ledger_demo_out/rev_003_withdraw_approval.diff.jsonl",
+  "diff_file_change_count": 2
+}

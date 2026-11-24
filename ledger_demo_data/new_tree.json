@@ -1,0 +1,55 @@
+{
+  "root": "NROOT",
+  "nodes": {
+    "NROOT": {
+      "parent": null,
+      "leaf": false,
+      "name": "NROOT 根"
+    },
+    "N_AUTO": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "自动迁入叶"
+    },
+    "N_M1": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "多去向一"
+    },
+    "N_M2": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "多去向二"
+    },
+    "N_WD": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "核准将撤回叶"
+    },
+    "N_R1": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "旧分流目标（将被移除）"
+    },
+    "N_R2": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "保留去向"
+    },
+    "N_R3": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "新替代去向"
+    },
+    "N_INC": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "未列全关系叶"
+    },
+    "N_UA": {
+      "parent": "NROOT",
+      "leaf": true,
+      "name": "未核准叶"
+    }
+  }
+}

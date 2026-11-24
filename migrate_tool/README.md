@@ -186,3 +186,218 @@ python3 -I migrate.py audit --old-tree /workspace/audit_demo_data/old_tree.json 
         --edges /workspace/audit_demo_data/edges.jsonl --outdir /workspace/audit_demo_out
 python3 -I test_audit.py             # 独立第二套实现重算对照 + 行序无关 + 错误拒绝 + 规模冒烟
 ```
+
+## 10. 可持续查询的货品迁移账本（ledger 子命令）
+
+`ledger.py`（也可通过 `migrate.py ledger ...` 调用）在离线对照工具旁增加一个
+可反复重开的 SQLite 账本。它接收一次**完整货品 JSONL**、旧/新树和第 2 节同格式
+的双向叶子对照，之后把关系声明和人工分流修订持久化，并只重算受影响货品。
+
+### 10.1 初始化
+
+```bash
+python3 -I /workspace/migrate_tool/ledger.py init \
+  --ledger /path/to/ledger_dir \
+  --items  /path/to/items.jsonl \
+  --old-tree /path/to/old_tree.json \
+  --new-tree /path/to/new_tree.json \
+  --mapping  /path/to/edges.jsonl
+```
+
+默认货品字段为 `item_id` 与 `old_leaf`，可用 `--item-id-field` /
+`--old-leaf-field` 改名。货品的全部原始 JSON 字段原样保存在 `raw_json`，导出时
+合并到结果行的 `_migration_ledger` 元数据对象中；若原货品恰好有同名字段，账本会
+改用不覆盖原字段的 `_migration_ledger_2` 等键名。
+
+初始化在一个 SQLite 事务中流式写货品。损坏 JSON、非对象行、重复 `item_id`、
+不存在的旧叶/新叶引用或重复对照边都会使**整次初始化回滚**，正式的
+`ledger.sqlite3` 不会出现；已存在的账本也不会被覆盖。
+
+### 10.2 当前判定规则
+
+账本只按稳定叶 ID 判断，不按名称猜：
+
+| 旧叶声明/分流状态 | 当前结果 | 原因码 |
+|---|---|---|
+| 旧叶去向列全，恰有 1 条去向且已核准 | 自动迁入该新叶 | — |
+| 去向列全且全部核准，但有多个去向；逐件分流当前指向其中一个核准去向 | 迁入分流目标 | — |
+| 多个核准去向，缺少有效逐件分流 | 待处理 | `manual_routing_required` |
+| 撤销了多去向下的分流 | 待处理 | `manual_routing_revoked` |
+| 旧叶完整性缺失或为 `false` | 待处理，保留原件 | `old_destinations_incomplete` |
+| 没有任何去向边 | 待处理 | `no_destination` |
+| 当前声明含 `approved=false` 的边 | 待处理 | `unapproved_relation` |
+| 有效状态的人工分流目标已被关系替换移除 | 待处理 | `manual_route_target_absent` / `invalid_manual_routing` |
+| 分流目标边当前未核准 | 待处理 | `manual_route_target_unapproved` / `invalid_manual_routing` |
+
+关系或分流每次都按**当前状态**重新判定。某个分流过去曾核准/曾成功迁入，并不给它
+永久豁免；核准撤回或目标被替换后，对应货品会进入下一次修订的净变化。
+
+### 10.3 修订请求与幂等编号
+
+按旧叶**完整替换**去向声明（`destinations` 是该旧叶此刻的完整列表；
+`complete=false` 时列表可以是未列全的已知部分）：
+
+```json
+{
+  "revision_id": "REV-0003",
+  "kind": "old_leaf_destinations",
+  "old_leaf": "O9",
+  "complete": true,
+  "destinations": [
+    {"new_leaf": "N9a", "approved": true},
+    {"new_leaf": "N9b", "approved": false}
+  ]
+}
+```
+
+按 `item_id` 替换人工分流：
+
+```json
+{
+  "revision_id": "REV-0004",
+  "kind": "manual_routing",
+  "item_id": "ITEM-1001",
+  "action": "replace",
+  "new_leaf": "N9a"
+}
+```
+
+撤销人工分流：
+
+```json
+{
+  "revision_id": "REV-0005",
+  "kind": "manual_routing",
+  "item_id": "ITEM-1001",
+  "action": "revoke"
+}
+```
+
+提交：
+
+```bash
+python3 -I /workspace/migrate_tool/ledger.py revise \
+  --ledger /path/to/ledger_dir \
+  --request /path/to/rev.json \
+  --diff-out /path/to/rev_delta.jsonl \
+  --receipt-out /path/to/rev_receipt.json
+```
+
+- `revision_id` 是修订号；账本保存规范化请求 JSON 与 SHA-256。
+- **同号 + 同内容**重送：返回 `"idempotent_replay": true`，不再写新变化行。
+- **同号 + 不同内容**：退出码 2 拒绝，原修订不变。
+- 坏 `item_id` / 旧叶 / 新叶引用、损坏请求在事务前或事务中拒绝并回滚。
+- 每次修订是一个 SQLite 事务；进程中断后重开只能看到完整旧版或完整新版。
+
+### 10.4 查询、摘要与一次修订的净变化
+
+```bash
+# 当前全量结果：migrated_items.jsonl、pending_items.jsonl、summary.json
+python3 -I /workspace/migrate_tool/ledger.py export \
+  --ledger /path/to/ledger_dir --outdir /path/to/current_out
+
+# 摘要到 stdout 或原子写入 JSON
+python3 -I /workspace/migrate_tool/ledger.py summary \
+  --ledger /path/to/ledger_dir --out summary.json
+
+# 按状态/原因/旧叶/item 查询
+python3 -I /workspace/migrate_tool/ledger.py query \
+  --ledger /path/to/ledger_dir --status pending \
+  --reason unapproved_relation --out pending_unapproved.jsonl
+
+# 以后再次查询某次修订的前后净变化
+python3 -I /workspace/migrate_tool/ledger.py diff \
+  --ledger /path/to/ledger_dir --revision-id REV-0003 --out rev3_delta.jsonl
+
+# 列修订 / 看单个货品的当前判定、分流史和变化史
+python3 -I /workspace/migrate_tool/ledger.py revisions --ledger /path/to/ledger_dir
+python3 -I /workspace/migrate_tool/ledger.py show \
+  --ledger /path/to/ledger_dir --item-id ITEM-1001
+```
+
+净变化文件每行包含 `item_id`、`change_kind`、`before`、`after` 和完整原始
+`item`。只有交付签名（`status/new_leaf/reasons`）变化的货品才写入
+`revision_change`；状态、目标和原因码均未变的货品计入
+`unchanged_item_count`，但**不进入净变化文件**。
+
+### 10.5 大规模与增量路径
+
+- 初始化只顺序读一次完整货品 JSONL，批量写 SQLite；不需要把所有货品放进内存。
+- `item(old_leaf, seq)` 与 `relation(old_leaf,new_leaf)` 是索引/主键。
+- 旧叶声明修订只读写该旧叶的关系、完整性行和该旧叶下的货品；人工分流只处理一个
+  `item_id`。日常修订命令不接收也不重读完整货品文件或整份对照文件。
+- SQLite B-tree 承担货品量和修订变化史；只读导出使用单个快照事务，输出文件经
+  同目录临时文件 + `fsync` + `rename` 原子替换。
+- 增量冒烟可运行 `python3 -I stress_ledger.py --items 100000 --old-leaves 200`。
+  参考环境中初始化 10 万件约 9 秒，单旧叶修订约 0.2 秒（只处理该叶 500 件），
+  子进程峰值 RSS 约 23 MB；调大 `--items` 可验证流式摄入。
+
+### 10.6 合成演示：核准撤回、分流失效、失败重试
+
+一键生成数据并跑完所有场景：
+
+```bash
+python3 -I /workspace/migrate_tool/make_ledger_demo_data.py \
+  /workspace/ledger_demo_data
+
+rm -rf /workspace/ledger_demo /workspace/ledger_demo_out
+python3 -I /workspace/migrate_tool/ledger.py init \
+  --ledger /workspace/ledger_demo \
+  --items /workspace/ledger_demo_data/items.jsonl \
+  --old-tree /workspace/ledger_demo_data/old_tree.json \
+  --new-tree /workspace/ledger_demo_data/new_tree.json \
+  --mapping /workspace/ledger_demo_data/mapping.jsonl
+
+# REV-001/002：先给多去向货品逐件分流
+for f in /workspace/ledger_demo_data/revisions/rev_00{1,2}_*.json; do
+  python3 -I /workspace/migrate_tool/ledger.py revise \
+    --ledger /workspace/ledger_demo --request "$f"
+done
+
+# REV-003：撤回 O_WITHDRAW -> N_WD 的核准；2 件已自动迁入货品变待处理
+python3 -I /workspace/migrate_tool/ledger.py revise \
+  --ledger /workspace/ledger_demo \
+  --request /workspace/ledger_demo_data/revisions/rev_003_withdraw_approval.json \
+  --diff-out /workspace/ledger_demo_out/rev_003_diff.jsonl
+
+# REV-004：O_ROUTE 移除 N_R1；旧分流目标消失，1 件变待处理，
+# 另 1 件前后都是 manual_routing_required，不进入净变化。
+python3 -I /workspace/migrate_tool/ledger.py revise \
+  --ledger /workspace/ledger_demo \
+  --request /workspace/ledger_demo_data/revisions/rev_004_replace_route_relation.json \
+  --diff-out /workspace/ledger_demo_out/rev_004_diff.jsonl
+
+# REV-005/006：把失效分流改到 N_R3；随后撤销 ITEM-MULTI-1 的分流。
+for f in /workspace/ledger_demo_data/revisions/rev_005_*.json \
+         /workspace/ledger_demo_data/revisions/rev_006_*.json; do
+  python3 -I /workspace/migrate_tool/ledger.py revise \
+    --ledger /workspace/ledger_demo --request "$f"
+done
+
+# 失败重试/幂等：同号同内容 no-op；同号改目标退出码 2；坏 item 引用退出码 2。
+python3 -I /workspace/migrate_tool/ledger.py revise \
+  --ledger /workspace/ledger_demo \
+  --request /workspace/ledger_demo_data/revisions/rev_001_route_multi1.json
+python3 -I /workspace/migrate_tool/ledger.py revise \
+  --ledger /workspace/ledger_demo \
+  --request /workspace/ledger_demo_data/revisions/rev_001_conflicting_reuse.json
+python3 -I /workspace/migrate_tool/ledger.py revise \
+  --ledger /workspace/ledger_demo \
+  --request /workspace/ledger_demo_data/revisions/rev_bad_unknown_item.json
+
+python3 -I /workspace/migrate_tool/ledger.py export \
+  --ledger /workspace/ledger_demo --outdir /workspace/ledger_demo_out/current
+python3 -I /workspace/migrate_tool/test_ledger.py
+```
+
+演示中的关键净变化：
+
+- `REV-003`：`affected_item_count=2, changed_item_count=2`，两件均
+  `migrated_to_pending`，原因 `unapproved_relation`。
+- `REV-004`：`affected_item_count=2, changed_item_count=1,
+  unchanged_item_count=1`；变化货品原因是
+  `manual_route_target_absent + invalid_manual_routing`。
+- 重发 `REV-001` 返回 `idempotent_replay=true`；发送
+  `rev_001_conflicting_reuse.json` 返回退出码 2 和“已用于不同内容”。
+- `items_duplicate.jsonl` 可验证重复货品 ID 整次初始化拒绝，且不生成正式
+  `ledger.sqlite3`。

@@ -1130,6 +1130,14 @@ def main():
     if argv and argv[0] == "audit":
         audit_main(argv[1:])
         return
+    if argv and argv[0] == "ledger":
+        # `python3 -I` 可能不把脚本目录放入 sys.path；显式加入本工具目录，
+        # 保证导入同目录 ledger.py，而不会吃到数据目录中的同名模块。
+        tool_dir = os.path.dirname(os.path.abspath(__file__))
+        if tool_dir not in sys.path:
+            sys.path.insert(0, tool_dir)
+        import ledger
+        sys.exit(ledger.main(argv[1:]))
     migrate_main(argv)
 
 

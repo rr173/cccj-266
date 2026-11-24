@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "item_count": 11,
+  "migrated_count": 3,
+  "pending_count": 8,
+  "migrated_ratio": 0.2727272727272727,
+  "latest_revision_id": "REV-006",
+  "user_revision_count": 6,
+  "old_leaf_count": 7,
+  "new_leaf_count": 9,
+  "relation_count": 8,
+  "migrated_by_new_leaf": [
+    {
+      "new_leaf": "N_AUTO",
+      "item_count": 2
+    },
+    {
+      "new_leaf": "N_R3",
+      "item_count": 1
+    }
+  ],
+  "pending_by_primary_reason": [
+    {
+      "reason": "manual_routing_required",
+      "item_count": 2
+    },
+    {
+      "reason": "manual_routing_revoked",
+      "item_count": 1
+    },
+    {
+      "reason": "no_destination",
+      "item_count": 1
+    },
+    {
+      "reason": "old_destinations_incomplete",
+      "item_count": 1
+    },
+    {
+      "reason": "unapproved_relation",
+      "item_count": 3
+    }
+  ],
+  "pending_by_reason_tag_counts": [
+    {
+      "reason": "invalid_manual_routing",
+      "item_count": 1
+    },
+    {
+      "reason": "manual_routing_required",
+      "item_count": 2
+    },
+    {
+      "reason": "manual_routing_revoked",
+      "item_count": 1
+    },
+    {
+      "reason": "no_destination",
+      "item_count": 1
+    },
+    {
+      "reason": "old_destinations_incomplete",
+      "item_count": 1
+    },
+    {
+      "reason": "unapproved_relation",
+      "item_count": 3
+    }
+  ]
+}

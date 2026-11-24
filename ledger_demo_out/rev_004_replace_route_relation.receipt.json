@@ -1,0 +1,21 @@
+{
+  "revision_id": "REV-004",
+  "idempotent_replay": false,
+  "applied": true,
+  "kind": "old_leaf_destinations",
+  "target_type": "old_leaf",
+  "target_id": "O_ROUTE",
+  "applied_at": "2026-11-24T18:38:12.509124+00:00",
+  "affected_item_count": 2,
+  "changed_item_count": 1,
+  "unchanged_item_count": 1,
+  "change_kind_counts": {
+    "migrated_to_pending": 1
+  },
+  "after_status_among_affected": {
+    "migrated": 0,
+    "pending": 2
+  },
+  "diff_file": "/workspace/ledger_demo_out/rev_004_replace_route_relation.diff.jsonl",
+  "diff_file_change_count": 1
+}

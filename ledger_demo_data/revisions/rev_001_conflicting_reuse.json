@@ -1,0 +1,7 @@
+{
+  "revision_id": "REV-001",
+  "kind": "manual_routing",
+  "item_id": "ITEM-MULTI-1",
+  "action": "replace",
+  "new_leaf": "N_M2"
+}

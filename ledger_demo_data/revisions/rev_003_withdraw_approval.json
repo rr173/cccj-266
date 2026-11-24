@@ -1,0 +1,13 @@
+{
+  "revision_id": "REV-003",
+  "kind": "old_leaf_destinations",
+  "old_leaf": "O_WITHDRAW",
+  "complete": true,
+  "destinations": [
+    {
+      "new_leaf": "N_WD",
+      "approved": false
+    }
+  ],
+  "note": "合成：治理员撤回核准"
+}

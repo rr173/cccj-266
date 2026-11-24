@@ -1,0 +1,7 @@
+{
+  "revision_id": "REV-BAD-REF",
+  "kind": "manual_routing",
+  "item_id": "ITEM-DOES-NOT-EXIST",
+  "action": "replace",
+  "new_leaf": "N_M1"
+}

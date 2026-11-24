@@ -1,0 +1,37 @@
+== same ID + same content retry (expect idempotent_replay=true, exit 0) ==
+{
+  "revision_id": "REV-001",
+  "idempotent_replay": true,
+  "operation": "no_op_same_id_and_content",
+  "effect_summary": {
+    "affected_item_count": 1,
+    "after_status_among_affected": {
+      "migrated": 1,
+      "pending": 0
+    },
+    "applied": true,
+    "applied_at": "2026-11-24T18:38:12.258627+00:00",
+    "change_kind_counts": {
+      "pending_to_migrated": 1
+    },
+    "changed_item_count": 1,
+    "idempotent_replay": false,
+    "kind": "manual_routing",
+    "old_leaf": "O_MULTI",
+    "revision_id": "REV-001",
+    "target_id": "ITEM-MULTI-1",
+    "target_type": "item_id",
+    "unchanged_item_count": 0
+  }
+}
+exit=0
+== same ID + different content (expect reject, exit 2) ==
+账本输入错误: 修订号 REV-001 已用于不同内容；同号不同内容必须拒绝，原修订保持不变
+exit=2
+== bad item reference (expect reject, exit 2) ==
+账本输入错误: 人工分流引用了不存在的 item_id: 'ITEM-DOES-NOT-EXIST'
+exit=2
+== duplicate item IDs init (expect reject, exit 2; no ledger.sqlite3) ==
+账本输入错误: 货品 item_id 重复，整次初始化拒绝: 'ITEM-AUTO-1'（/workspace/ledger_demo_data/items_duplicate.jsonl 第 12 行）
+exit=2
+formal_db=absent(correct)

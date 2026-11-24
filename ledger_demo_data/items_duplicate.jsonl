@@ -1,0 +1,12 @@
+{"item_id": "ITEM-AUTO-1", "old_leaf": "O_AUTO", "title": "自动货一", "price": 19.9, "tags": ["a", "b"]}
+{"item_id": "ITEM-AUTO-2", "old_leaf": "O_AUTO", "title": "自动货二", "price": 20.0}
+{"item_id": "ITEM-MULTI-1", "old_leaf": "O_MULTI", "title": "多去向逐件指定 M1", "sku": "M-1"}
+{"item_id": "ITEM-MULTI-2", "old_leaf": "O_MULTI", "title": "多去向但无分流", "sku": "M-2"}
+{"item_id": "ITEM-WD-1", "old_leaf": "O_WITHDRAW", "title": "核准撤回货一"}
+{"item_id": "ITEM-WD-2", "old_leaf": "O_WITHDRAW", "title": "核准撤回货二"}
+{"item_id": "ITEM-ROUTE-1", "old_leaf": "O_ROUTE", "title": "分流随后失效"}
+{"item_id": "ITEM-ROUTE-2", "old_leaf": "O_ROUTE", "title": "另一个多去向无分流"}
+{"item_id": "ITEM-INC-1", "old_leaf": "O_INCOMPLETE", "title": "未列全"}
+{"item_id": "ITEM-NONE-1", "old_leaf": "O_NONE", "title": "无去向"}
+{"item_id": "ITEM-UA-1", "old_leaf": "O_UNAPPROVED", "title": "未核准边"}
+{"item_id": "ITEM-AUTO-1", "old_leaf": "O_AUTO", "title": "自动货一", "price": 19.9, "tags": ["a", "b"]}

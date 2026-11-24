@@ -1,0 +1,12 @@
+{
+  "initialized": true,
+  "ledger": "/workspace/ledger_demo",
+  "item_count": 11,
+  "migrated_count": 4,
+  "pending_count": 7,
+  "old_leaf_count": 7,
+  "new_leaf_count": 9,
+  "edge_count": 8,
+  "old_completeness_records": 7,
+  "new_completeness_records": 9
+}
