@@ -1,0 +1,18 @@
+{
+  "old_leaf_count": 15,
+  "old_selected_leaf_count": 10,
+  "new_leaf_count": 15,
+  "new_include_leaf_count": 8,
+  "new_review_leaf_count": 3,
+  "new_exclude_leaf_count": 4,
+  "new_no_historical_source_count": 2,
+  "executable_subtree_root_count": 5,
+  "partial_or_unmigrated_old_leaf_count": 4,
+  "unapproved_edge_count": 1,
+  "duplicate_name_nodes": {
+    "干净承接叶": [
+      "N8",
+      "N99"
+    ]
+  }
+}

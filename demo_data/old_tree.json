@@ -1,0 +1,110 @@
+{
+  "root": "O1",
+  "nodes": {
+    "O1": {
+      "parent": null,
+      "leaf": false,
+      "name": "旧采购根"
+    },
+    "O2": {
+      "parent": "O1",
+      "leaf": false,
+      "name": "整类勾选区（内部有挖除）"
+    },
+    "O3": {
+      "parent": "O2",
+      "leaf": true,
+      "name": "直接旧叶"
+    },
+    "O4": {
+      "parent": "O2",
+      "leaf": false,
+      "name": "被挖掉的子类"
+    },
+    "O5": {
+      "parent": "O4",
+      "leaf": true,
+      "name": "挖除叶A"
+    },
+    "O6": {
+      "parent": "O4",
+      "leaf": true,
+      "name": "挖除叶B"
+    },
+    "O7": {
+      "parent": "O1",
+      "leaf": false,
+      "name": "干净整选类"
+    },
+    "O8": {
+      "parent": "O7",
+      "leaf": true,
+      "name": "干净旧叶"
+    },
+    "O9": {
+      "parent": "O1",
+      "leaf": true,
+      "name": "一对多拆分类旧叶"
+    },
+    "O10": {
+      "parent": "O1",
+      "leaf": true,
+      "name": "多对一来源A（选）"
+    },
+    "O11": {
+      "parent": "O1",
+      "leaf": true,
+      "name": "多对一来源B（不选）"
+    },
+    "O12": {
+      "parent": "O1",
+      "leaf": true,
+      "name": "老范围外旧叶（不选）"
+    },
+    "O13": {
+      "parent": "O1",
+      "leaf": true,
+      "name": "去向未列全旧叶（选）"
+    },
+    "O14": {
+      "parent": "O1",
+      "leaf": true,
+      "name": "确认无去向旧叶（选）"
+    },
+    "O20": {
+      "parent": "O1",
+      "leaf": true,
+      "name": "指向待复核新叶的旧叶（选）"
+    },
+    "O22": {
+      "parent": "O1",
+      "leaf": false,
+      "name": "深层整选链顶"
+    },
+    "O15": {
+      "parent": "O22",
+      "leaf": true,
+      "name": "深链旧叶A"
+    },
+    "O16": {
+      "parent": "O22",
+      "leaf": true,
+      "name": "深链旧叶B"
+    },
+    "O23": {
+      "parent": "O1",
+      "leaf": false,
+      "name": "兄弟取舍不同的内部类"
+    },
+    "O17": {
+      "parent": "O23",
+      "leaf": true,
+      "name": "兄弟中被选旧叶"
+    },
+    "O18": {
+      "parent": "O23",
+      "leaf": true,
+      "name": "兄弟中不选旧叶"
+    }
+  }
+}

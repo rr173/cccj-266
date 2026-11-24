@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "generated_at_utc": "2026-11-24T13:55:48.515597+00:00",
+  "semantics": "include_whole_subtrees_only",
+  "subtree_roots": [
+    {
+      "node_id": "N2",
+      "name": "干净承接类",
+      "include_leaf_count": 1
+    },
+    {
+      "node_id": "N3",
+      "name": "拆分承接类",
+      "include_leaf_count": 3
+    },
+    {
+      "node_id": "N7",
+      "name": "部分迁交区",
+      "include_leaf_count": 1
+    },
+    {
+      "node_id": "N21",
+      "name": "深层链顶",
+      "include_leaf_count": 2
+    },
+    {
+      "node_id": "N17",
+      "name": "新选叶",
+      "include_leaf_count": 1
+    }
+  ],
+  "expanded_include_leaves": [
+    "N15",
+    "N16",
+    "N17",
+    "N3c",
+    "N7a",
+    "N8",
+    "N9a",
+    "N9b"
+  ],
+  "include_leaf_count": 8
+}

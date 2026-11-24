@@ -1,0 +1,125 @@
+{
+  "root": "N1",
+  "nodes": {
+    "N1": {
+      "parent": null,
+      "leaf": false,
+      "name": "新采购根"
+    },
+    "N2": {
+      "parent": "N1",
+      "leaf": false,
+      "name": "干净承接类"
+    },
+    "N8": {
+      "parent": "N2",
+      "leaf": true,
+      "name": "干净承接叶"
+    },
+    "N3": {
+      "parent": "N1",
+      "leaf": false,
+      "name": "拆分承接类"
+    },
+    "N3c": {
+      "parent": "N3",
+      "leaf": true,
+      "name": "直接承接叶"
+    },
+    "N9a": {
+      "parent": "N3",
+      "leaf": true,
+      "name": "拆分承接A"
+    },
+    "N9b": {
+      "parent": "N3",
+      "leaf": true,
+      "name": "拆分承接B"
+    },
+    "N4": {
+      "parent": "N1",
+      "leaf": false,
+      "name": "混合多对一区"
+    },
+    "N10": {
+      "parent": "N4",
+      "leaf": true,
+      "name": "混合多对一叶"
+    },
+    "N5": {
+      "parent": "N1",
+      "leaf": false,
+      "name": "来源不全区"
+    },
+    "N12": {
+      "parent": "N5",
+      "leaf": true,
+      "name": "范围外但来源未列全叶"
+    },
+    "N6": {
+      "parent": "N1",
+      "leaf": false,
+      "name": "确认排除区"
+    },
+    "N13": {
+      "parent": "N6",
+      "leaf": true,
+      "name": "确认无历史来源叶"
+    },
+    "N5b": {
+      "parent": "N6",
+      "leaf": true,
+      "name": "仅不选来源的排除叶"
+    },
+    "N99": {
+      "parent": "N6",
+      "leaf": true,
+      "name": "干净承接叶"
+    },
+    "N7": {
+      "parent": "N1",
+      "leaf": false,
+      "name": "部分迁交区"
+    },
+    "N7a": {
+      "parent": "N7",
+      "leaf": true,
+      "name": "仅承接部分旧货物叶"
+    },
+    "N8b": {
+      "parent": "N1",
+      "leaf": true,
+      "name": "待复核混合新叶"
+    },
+    "N21": {
+      "parent": "N1",
+      "leaf": false,
+      "name": "深层链顶"
+    },
+    "N15": {
+      "parent": "N21",
+      "leaf": true,
+      "name": "深链新叶A"
+    },
+    "N16": {
+      "parent": "N21",
+      "leaf": true,
+      "name": "深链新叶B"
+    },
+    "N23": {
+      "parent": "N1",
+      "leaf": false,
+      "name": "新混合区"
+    },
+    "N17": {
+      "parent": "N23",
+      "leaf": true,
+      "name": "新选叶"
+    },
+    "N18": {
+      "parent": "N23",
+      "leaf": true,
+      "name": "新不选叶"
+    }
+  }
+}
