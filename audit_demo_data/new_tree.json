@@ -1,0 +1,45 @@
+{
+  "root": "NRA",
+  "nodes": {
+    "NRA": {
+      "parent": null,
+      "leaf": false,
+      "name": "审计新树根"
+    },
+    "NC1": {
+      "parent": "NRA",
+      "leaf": false,
+      "name": "承接确认区"
+    },
+    "NA": {
+      "parent": "NC1",
+      "leaf": true,
+      "name": "闭合关系新叶"
+    },
+    "NB": {
+      "parent": "NC1",
+      "leaf": true,
+      "name": "确认缺失新叶"
+    },
+    "NC": {
+      "parent": "NC1",
+      "leaf": true,
+      "name": "承接未列全旧叶的新叶"
+    },
+    "NC2": {
+      "parent": "NRA",
+      "leaf": false,
+      "name": "无对应确认区"
+    },
+    "ND": {
+      "parent": "NC2",
+      "leaf": true,
+      "name": "确认无对应新叶"
+    },
+    "NE": {
+      "parent": "NC2",
+      "leaf": true,
+      "name": "未核准边新叶"
+    }
+  }
+}

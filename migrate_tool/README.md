@@ -130,3 +130,59 @@ python3 -I stress_test.py      # 10 万层深链 / 5 万叶宽树，验证无递
 
 合成演示覆盖：内部挖除（最深标记胜）、一对多拆分、多对一混合、来源未列全、
 确认无历史来源、未核准边、同名不归并、深链整选、兄弟取舍不同导致的最大子树拦阻。
+
+## 9. 对照片发布审计（audit 子命令，不依赖老筛选）
+
+交接前，数据治理员需要先确认**双向对照片本身**能否作为可发布的来源。
+迁交流程只在给定老筛选时判断哪些新叶可交付，发现不了关系表中影响所有报表的
+闭合缺口；审计入口只读旧树、新树与 JSONL 对照片，不读老筛选：
+
+```bash
+python3 -I migrate.py audit \
+  --old-tree /path/old_tree.jsonl \
+  --new-tree /path/new_tree.jsonl \
+  --edges    /path/edges.jsonl \
+  --outdir   /path/audit_out
+```
+
+### 判定规则
+
+- 每条**已核准**边把两端叶并入同一个**关系块**（传递闭包，并查集）。
+- 块内任一旧叶/新叶的完整性确认**缺失**（无记录）或**明确未列全**
+  （`complete=false`，仍可能有未列来源/去向）→ 该关系块**未闭合**；
+  问题清单列出块内全部叶、核准边与每个缺口的具体一侧原因。
+- 两端都明确列全的叶才能让关系块闭合；**无核准边且明确列全的孤立叶**
+  表示“确认无对应”，是闭合单叶块，不是问题。
+- **未核准边不进关系块**，作为待处理边单独保留；
+  只要存在待处理边或未闭合关系块，整体结论即为**不可发布**。
+
+### 审计产物（全部在 outdir）
+
+| 文件 | 内容 |
+|---|---|
+| `publish_audit_summary.json` | 机器可读摘要：可发布结论、闭合/未闭合块计数、待处理边计数、缺口数 |
+| `publish_block_issues.jsonl` | 逐未闭合关系块问题清单：稳定块号 `BLK-*`、块内全部叶、核准边、每个缺口的一侧原因（`missing_confirmation` 缺失确认 / `explicitly_incomplete` 明确未列全） |
+| `publish_pending_edges.jsonl` | 待处理未核准边（`unapproved_edge`），单独保留 |
+
+无问题的闭合块只在摘要中计数，不进入问题清单。
+
+### 确定性与规模
+
+- 块号按“树前序叶序”最小成员升序赋号，成员/缺口按叶序，边按
+  （块， 旧叶， 新叶） 排序：重复运行同一输入时，块标识、成员顺序、原因和计数
+  **不受 JSONL 行顺序影响**。
+- 内存只保留 O（叶数） 结构（并查集、确认状态、块号、成员 CSR）；边表两趟流式、
+  落盘为 12 字节定长记录，三遍稳定计数排序后顺序读取——不把整张边表或
+  关系块副本作为内存前提（10 万边实测峰值 RSS 约 97 MB）。
+- 重复边在 （旧叶， 新叶） 有序后相邻扫描发现；引用不存在/非叶节点、重复关系、
+  非法完整性记录等仍以退出码 2 拒绝，错误语义与迁交流程一致。
+
+### 审计演示与自检
+
+```bash
+python3 -I make_audit_demo_data.py   # 合成：闭合关系 / 单侧缺确认未闭合块 / 未核准边
+python3 -I migrate.py audit --old-tree /workspace/audit_demo_data/old_tree.json \
+        --new-tree /workspace/audit_demo_data/new_tree.json \
+        --edges /workspace/audit_demo_data/edges.jsonl --outdir /workspace/audit_demo_out
+python3 -I test_audit.py             # 独立第二套实现重算对照 + 行序无关 + 错误拒绝 + 规模冒烟
+```

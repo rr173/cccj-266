@@ -1,0 +1,45 @@
+{
+  "root": "ORA",
+  "nodes": {
+    "ORA": {
+      "parent": null,
+      "leaf": false,
+      "name": "审计旧树根"
+    },
+    "OC1": {
+      "parent": "ORA",
+      "leaf": false,
+      "name": "承接确认区"
+    },
+    "OA": {
+      "parent": "OC1",
+      "leaf": true,
+      "name": "闭合关系旧叶"
+    },
+    "OB": {
+      "parent": "OC1",
+      "leaf": true,
+      "name": "对端缺确认旧叶"
+    },
+    "OC": {
+      "parent": "OC1",
+      "leaf": true,
+      "name": "明确未列全旧叶"
+    },
+    "OC2": {
+      "parent": "ORA",
+      "leaf": false,
+      "name": "无对应确认区"
+    },
+    "OD": {
+      "parent": "OC2",
+      "leaf": true,
+      "name": "确认无对应旧叶"
+    },
+    "OE": {
+      "parent": "OC2",
+      "leaf": true,
+      "name": "未核准边旧叶"
+    }
+  }
+}

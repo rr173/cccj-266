@@ -31,6 +31,13 @@
   * 边表 JSONL 单行扫描、只过一遍：边证据即时落盘 evidence.jsonl，内存只保留每叶聚合信息
     与对端整数索引，绝不逐条边回扫整棵树。树的遍历趟数为常数（建校验/生效标记/
     子树状态/输出），与边数无关。
+
+对照片发布审计（audit 子命令，不依赖老筛选）：
+  python3 -I migrate.py audit --old-tree T1 --new-tree T2 --edges E.jsonl --outdir OUT
+  只读旧树、新树与 JSONL 对照片，判断对照片本身是否闭合到可发布：
+  已核准边把两端叶并入同一关系块；块内任一叶完整性确认缺失或明确未列全
+  -> 块未闭合；未核准边不进关系块、作为待处理边单独保留；存在未闭合块
+  或待处理边 -> 整体不可发布。详见 README 第 9 节。
 """
 
 import argparse
@@ -38,6 +45,7 @@ import array
 import json
 import os
 import resource
+import struct
 import sys
 from datetime import datetime, timezone
 
@@ -599,16 +607,357 @@ def expand_subtree_roots(tree, roots):
     return leaves
 
 
+# ----------------------------- 对照片发布审计（audit 子命令） -----------------------------
+#
+# 与迁交流程的区别：不读老筛选，只审“旧树 + 新树 + 对照片”本身是否闭合到可发布。
+#   * 每条已核准边把两端叶并入同一关系块（并查集，迭代 find，无递归）。
+#   * 块内任一旧叶/新叶的完整性确认缺失（无记录）或明确 complete=false
+#     （仍可能有未列来源/去向）-> 块未闭合；问题清单列出块内全部叶、核准边
+#     与每个缺口的具体一侧原因。
+#   * 无核准边且明确列全的孤立叶 = 确认无对应（闭合单叶块，不是问题）。
+#   * 未核准边不进关系块，作为待处理边单独保留；
+#     只要存在待处理边或未闭合块 -> 整体不可发布。
+#
+# 确定性：块号 = 按“树前序叶序”最小成员升序赋号；成员/缺口按叶序；
+# 边按 (块, 旧叶, 新叶) 计数排序 —— 均只取决于树与边集合，与 JSONL 行序无关。
+#
+# 内存前提：仅 O(叶数) 结构（并查集、确认状态、块号、成员 CSR）。
+# 边表两趟流式、落盘为 12 字节定长记录，三遍稳定计数排序后顺序读取；
+# 重复边在 (旧叶, 新叶) 有序后相邻扫描发现，不在内存保存整张边表或关系块副本。
+
+AUDIT_COMP_MISSING, AUDIT_COMP_FALSE, AUDIT_COMP_TRUE = 0, 1, 2
+_EDGE_REC = struct.Struct("<iii")  # (排序键: 块号+1 / 未核准为 0, 旧叶序号, 新叶序号)
+
+
+def _counting_sort_records(src, dst, nrec, keyoff, radix):
+    """稳定计数排序定长记录文件：按 keyoff 处 '<i' 键（键域 [0, radix)）src -> dst。
+    顺序读 src、按计算位写 dst；内存 O(radix)，与记录数无关。"""
+    recsize = _EDGE_REC.size
+    counts = array.array("q", [0]) * radix
+    with open(src, "rb") as f:
+        left = nrec
+        while left > 0:
+            buf = f.read(recsize * min(left, 65536))
+            if not buf:
+                fail("审计暂存文件损坏（记录数不足）")
+            for off in range(0, len(buf), recsize):
+                counts[struct.unpack_from("<i", buf, off + keyoff)[0]] += 1
+            left -= len(buf) // recsize
+    offs = array.array("q", [0]) * radix
+    acc = 0
+    for k in range(radix):
+        offs[k] = acc
+        acc += counts[k]
+    cursor = array.array("q", offs)
+    with open(src, "rb") as f, open(dst, "wb", buffering=1 << 20) as g:
+        for _ in range(nrec):
+            rec = f.read(recsize)
+            if len(rec) != recsize:
+                fail("审计暂存文件损坏（记录截断）")
+            key = struct.unpack_from("<i", rec, keyoff)[0]
+            pos = cursor[key]
+            cursor[key] = pos + 1
+            g.seek(pos * recsize)
+            g.write(rec)
+
+
+def audit_main(argv):
+    ap = argparse.ArgumentParser(
+        prog="migrate.py audit",
+        description="对照片发布审计：不依赖老筛选，检查双向对照片本身是否闭合到可发布。")
+    ap.add_argument("--old-tree", required=True)
+    ap.add_argument("--new-tree", required=True)
+    ap.add_argument("--edges", required=True)
+    ap.add_argument("--outdir", required=True)
+    args = ap.parse_args(argv)
+
+    os.makedirs(args.outdir, exist_ok=True)
+    old_tree = TreeStore(args.old_tree)
+    new_tree = TreeStore(args.new_tree)
+    on_, nn = old_tree.leaf_n, new_tree.leaf_n
+    total = on_ + nn
+
+    # 每叶完整性确认状态：0 缺失 / 1 明确未列全 / 2 明确列全
+    old_state = bytearray(on_)
+    new_state = bytearray(nn)
+
+    # 并查集：旧叶占 [0, on_)，新叶占 [on_, on_+nn)；迭代 find，树深/块规模无递归风险
+    uf_parent = array.array("i", range(total))
+    uf_size = array.array("i", [1]) * total
+
+    def uf_find(x):
+        while uf_parent[x] != x:
+            uf_parent[x] = uf_parent[uf_parent[x]]
+            x = uf_parent[x]
+        return x
+
+    approved_count = 0
+    pending_count = 0
+
+    # ---- 第一趟：校验 + 完整性状态 + 已核准边并块（边表只过一遍，不在内存留边）
+    for rec in iter_jsonl(args.edges):
+        rtype = rec.get("type", "edge")
+        if rtype == "completeness":
+            side = rec.get("side")
+            if side not in ("new", "old"):
+                fail("completeness 记录 side 非法: %r" % rec)
+            if not isinstance(rec.get("complete"), bool):
+                fail("completeness 记录 complete 必须为布尔值: %r" % rec)
+            if side == "new":
+                li = new_tree.require_leaf(rec.get("leaf"), "new")
+                new_state[li] = AUDIT_COMP_TRUE if rec["complete"] else AUDIT_COMP_FALSE
+            else:
+                li = old_tree.require_leaf(rec.get("leaf"), "old")
+                old_state[li] = AUDIT_COMP_TRUE if rec["complete"] else AUDIT_COMP_FALSE
+            continue
+        if rtype != "edge":
+            fail("未知边表记录类型: %r" % rec)
+        oid, nid = rec.get("old"), rec.get("new")
+        approved = rec.get("approved")
+        if oid is None or nid is None or not isinstance(approved, bool):
+            fail("edge 记录字段不全/类型错: %r" % rec)
+        oi = old_tree.require_leaf(oid, "old")
+        ni = new_tree.require_leaf(nid, "new")
+        if approved:
+            ra, rb = uf_find(oi), uf_find(on_ + ni)
+            if ra != rb:
+                if uf_size[ra] < uf_size[rb]:
+                    ra, rb = rb, ra
+                uf_parent[rb] = ra
+                uf_size[ra] += uf_size[rb]
+            approved_count += 1
+        else:
+            pending_count += 1
+    edge_rows = approved_count + pending_count
+
+    # ---- 关系块编号：规范代表元 = 块内最小叶序号，按叶序升序赋号（与 JSONL 行序无关）
+    minrep = array.array("i", [-1]) * total
+    for i in range(total):
+        r = uf_find(i)
+        if minrep[r] < 0 or i < minrep[r]:
+            minrep[r] = i
+    block_of_leaf = array.array("i", [-1]) * total
+    block_of_rep = array.array("i", [-1]) * total
+    nb = 0
+    for i in range(total):
+        c = minrep[uf_find(i)]
+        b = block_of_rep[c]
+        if b < 0:
+            b = nb
+            nb += 1
+            block_of_rep[c] = b
+        block_of_leaf[i] = b
+    del minrep, block_of_rep, uf_parent, uf_size
+
+    # ---- 闭合性：块内任一叶未明确列全 -> 未闭合；统计每块缺口数
+    closed = bytearray([1]) * nb
+    gap_cnt = array.array("i", [0]) * nb
+    for i in range(total):
+        st = old_state[i] if i < on_ else new_state[i - on_]
+        if st != AUDIT_COMP_TRUE:
+            b = block_of_leaf[i]
+            closed[b] = 0
+            gap_cnt[b] += 1
+
+    # ---- 块成员 CSR（每叶一条，全局仅一份；输出未闭合块时按块切片引用，不复制）
+    member_off = array.array("q", [0]) * (nb + 1)
+    for i in range(total):
+        member_off[block_of_leaf[i] + 1] += 1
+    for b in range(nb):
+        member_off[b + 1] += member_off[b]
+    members = array.array("i", [0]) * total
+    cur = array.array("q", member_off[:-1])
+    for i in range(total):
+        b = block_of_leaf[i]
+        members[cur[b]] = i
+        cur[b] += 1
+    del cur
+
+    # ---- 第二趟：边表落盘为定长记录（排序键 = 块号+1，未核准边为 0）
+    scratch_a = os.path.join(args.outdir, ".audit_edges_a.bin")
+    scratch_b = os.path.join(args.outdir, ".audit_edges_b.bin")
+    key_cnt = array.array("q", [0]) * (nb + 1)
+    edge_total = 0
+    seen_approved = 0
+    with open(scratch_a, "wb") as g:
+        for rec in iter_jsonl(args.edges):
+            if rec.get("type", "edge") != "edge":
+                continue
+            oi = old_tree.require_leaf(rec.get("old"), "old")
+            ni = new_tree.require_leaf(rec.get("new"), "new")
+            if rec.get("approved"):
+                seen_approved += 1
+                key = block_of_leaf[oi] + 1
+            else:
+                key = 0
+            key_cnt[key] += 1
+            g.write(_EDGE_REC.pack(key, oi, ni))
+            edge_total += 1
+    if seen_approved != approved_count or edge_total != edge_rows:
+        fail("对照片在审计过程中被修改，请保持输入文件不变")
+
+    # ---- 三遍稳定计数排序：先 (新叶, 旧叶) 使重复边相邻以便检测，再按块键分组。
+    #      最终顺序：待处理边(键0, 按旧/新叶序) + 各块(键=块号+1, 块内按旧/新叶序)。
+    _counting_sort_records(scratch_a, scratch_b, edge_total, 8, nn)   # 按新叶序号
+    _counting_sort_records(scratch_b, scratch_a, edge_total, 4, on_)  # 按旧叶序号
+    prev = None
+    with open(scratch_a, "rb") as f:
+        for _ in range(edge_total):
+            rec = _EDGE_REC.unpack(f.read(_EDGE_REC.size))
+            oi, ni = rec[1], rec[2]
+            if prev is not None and oi == prev[0] and ni == prev[1]:
+                fail("旧叶 %s 与新叶 %s 之间存在重复边记录" % (
+                    old_tree.ids[old_tree.node_idx_for_leaf(oi)],
+                    new_tree.ids[new_tree.node_idx_for_leaf(ni)]))
+            prev = (oi, ni)
+    _counting_sort_records(scratch_a, scratch_b, edge_total, 0, nb + 1)  # 按块键
+
+    # ---- 输出：待处理边 + 逐未闭合块问题清单（顺序流式读最终文件，边不进内存）
+    width = max(4, len(str(nb)))
+
+    def block_label(b):
+        return "BLK-%0*d" % (width, b + 1)
+
+    issues_path = os.path.join(args.outdir, "publish_block_issues.jsonl")
+    pending_path = os.path.join(args.outdir, "publish_pending_edges.jsonl")
+    console_blocks, console_pending = [], []
+    unclosed_count = 0
+    with open(scratch_b, "rb") as ef, \
+         open(pending_path, "w", encoding="utf-8") as pend, \
+         open(issues_path, "w", encoding="utf-8") as iss:
+        for _ in range(key_cnt[0]):
+            rec = _EDGE_REC.unpack(ef.read(_EDGE_REC.size))
+            onode = old_tree.node_idx_for_leaf(rec[1])
+            nnode = new_tree.node_idx_for_leaf(rec[2])
+            oid, nid = old_tree.ids[onode], new_tree.ids[nnode]
+            pend.write(json.dumps({
+                "kind": "pending_edge",
+                "problem": "unapproved_edge",
+                "problem_cn": "未核准边",
+                "old": oid, "old_name": old_tree.names[onode],
+                "new": nid, "new_name": new_tree.names[nnode],
+            }, ensure_ascii=False) + "\n")
+            if len(console_pending) < 50:
+                console_pending.append("%s -> %s" % (oid, nid))
+        for b in range(nb):
+            ecnt = key_cnt[b + 1]
+            if closed[b]:
+                ef.seek(ecnt * _EDGE_REC.size, os.SEEK_CUR)   # 闭合块只计数，跳过
+                continue
+            unclosed_count += 1
+            lo, hi = member_off[b], member_off[b + 1]
+            old_leaves, new_leaves, gaps = [], [], []
+            for p in range(lo, hi):
+                leaf = members[p]
+                if leaf < on_:
+                    node = old_tree.node_idx_for_leaf(leaf)
+                    old_leaves.append({"node_id": old_tree.ids[node],
+                                       "name": old_tree.names[node]})
+                    st, side, ids, names = old_state[leaf], "old", old_tree.ids, old_tree.names
+                else:
+                    node = new_tree.node_idx_for_leaf(leaf - on_)
+                    new_leaves.append({"node_id": new_tree.ids[node],
+                                       "name": new_tree.names[node]})
+                    st, side, ids, names = new_state[leaf - on_], "new", new_tree.ids, new_tree.names
+                if st != AUDIT_COMP_TRUE:
+                    gaps.append({
+                        "side": side,
+                        "node_id": ids[node],
+                        "name": names[node],
+                        "problem": ("missing_confirmation" if st == AUDIT_COMP_MISSING
+                                    else "explicitly_incomplete"),
+                        "problem_cn": ("完整性确认缺失" if st == AUDIT_COMP_MISSING
+                                       else "明确未列全（仍可能有未列来源/去向）"),
+                    })
+            iss.write('{"kind":"unclosed_block","block_id":%s,"gap_count":%d,'
+                      '"old_leaves":%s,"new_leaves":%s,"approved_edges":['
+                      % (json.dumps(block_label(b)), len(gaps),
+                         json.dumps(old_leaves, ensure_ascii=False),
+                         json.dumps(new_leaves, ensure_ascii=False)))
+            for k in range(ecnt):
+                rec = _EDGE_REC.unpack(ef.read(_EDGE_REC.size))
+                onode = old_tree.node_idx_for_leaf(rec[1])
+                nnode = new_tree.node_idx_for_leaf(rec[2])
+                iss.write(("" if k == 0 else ",") + json.dumps(
+                    {"old": old_tree.ids[onode], "new": new_tree.ids[nnode]},
+                    ensure_ascii=False))
+            iss.write('],"gaps":%s}\n' % json.dumps(gaps, ensure_ascii=False))
+            if len(console_blocks) < 50:
+                console_blocks.append("%s 旧叶%s 新叶%s 缺口[%s]" % (
+                    block_label(b),
+                    [d["node_id"] for d in old_leaves],
+                    [d["node_id"] for d in new_leaves],
+                    "; ".join("%s:%s %s" % (g["side"], g["node_id"], g["problem_cn"])
+                              for g in gaps)))
+        if ef.read(1):
+            fail("内部不变量被破坏：边记录未消费完")
+
+    closed_count = nb - unclosed_count
+    publishable = (unclosed_count == 0 and pending_count == 0)
+    summary = {
+        "schema": 1,
+        "audit": "mapping_sheet_publication",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "publishable": publishable,
+        "conclusion": "publishable" if publishable else "not_publishable",
+        "conclusion_cn": "可发布" if publishable else "不可发布",
+        "block_count": nb,
+        "closed_block_count": closed_count,
+        "unclosed_block_count": unclosed_count,
+        "pending_edge_count": pending_count,
+        "approved_edge_count": approved_count,
+        "gap_count": sum(gap_cnt),
+        "old_leaf_count": on_,
+        "new_leaf_count": nn,
+        "issues_file": "publish_block_issues.jsonl",
+        "pending_edges_file": "publish_pending_edges.jsonl",
+    }
+    with open(os.path.join(args.outdir, "publish_audit_summary.json"), "w",
+              encoding="utf-8") as fh:
+        json.dump(summary, fh, ensure_ascii=False, indent=2)
+
+    for p in (scratch_a, scratch_b):
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+
+    peak_rss_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    print("=" * 68)
+    print("对照片发布审计完成。结论：%s。" % summary["conclusion_cn"])
+    print("关系块共 %d 个：闭合 %d，未闭合 %d；待处理未核准边 %d 条；缺口 %d 处。"
+          % (nb, closed_count, unclosed_count, pending_count, summary["gap_count"]))
+    if console_blocks:
+        print("-" * 68)
+        print("未闭合关系块（详见 %s）：" % issues_path)
+        for line in console_blocks:
+            print("    * %s" % line)
+        if unclosed_count > len(console_blocks):
+            print("    … 其余 %d 个见问题清单文件" % (unclosed_count - len(console_blocks)))
+    if console_pending:
+        print("-" * 68)
+        print("待处理未核准边（详见 %s）：" % pending_path)
+        for line in console_pending:
+            print("    * %s" % line)
+        if pending_count > len(console_pending):
+            print("    … 其余 %d 条见待处理边文件" % (pending_count - len(console_pending)))
+    print("-" * 68)
+    print("本进程峰值 RSS 约 %.1f MB（O(叶数) 结构；边表落盘排序，不进内存）。"
+          % (peak_rss_kb / 1024))
+    print("审计产物位于: %s" % args.outdir)
+
+
 # ----------------------------- 主流程 -----------------------------
 
-def main():
-    ap = argparse.ArgumentParser(description="离线分类筛选迁交工具")
+def migrate_main(argv):
+    ap = argparse.ArgumentParser(
+        description="离线分类筛选迁交工具（对照片发布审计请用 audit 子命令）")
     ap.add_argument("--old-tree", required=True)
     ap.add_argument("--new-tree", required=True)
     ap.add_argument("--old-filter", required=True)
     ap.add_argument("--edges", required=True)
     ap.add_argument("--outdir", required=True)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     os.makedirs(args.outdir, exist_ok=True)
     evidence_path = os.path.join(args.outdir, "evidence.jsonl")
@@ -774,6 +1123,14 @@ def main():
             print("    名称 %r -> 节点 %s" % (nm, ", ".join(idl)))
     print("=" * 68)
     print("全部产物位于: %s" % args.outdir)
+
+
+def main():
+    argv = sys.argv[1:]
+    if argv and argv[0] == "audit":
+        audit_main(argv[1:])
+        return
+    migrate_main(argv)
 
 
 if __name__ == "__main__":

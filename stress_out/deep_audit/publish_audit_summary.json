@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "audit": "mapping_sheet_publication",
+  "generated_at_utc": "2026-11-24T15:40:08.368909+00:00",
+  "publishable": true,
+  "conclusion": "publishable",
+  "conclusion_cn": "可发布",
+  "block_count": 100001,
+  "closed_block_count": 100001,
+  "unclosed_block_count": 0,
+  "pending_edge_count": 0,
+  "approved_edge_count": 100001,
+  "gap_count": 0,
+  "old_leaf_count": 100001,
+  "new_leaf_count": 100001,
+  "issues_file": "publish_block_issues.jsonl",
+  "pending_edges_file": "publish_pending_edges.jsonl"
+}

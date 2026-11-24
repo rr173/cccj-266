@@ -1,0 +1,13 @@
+{"type": "edge", "old": "OB", "new": "NB", "approved": true}
+{"type": "completeness", "side": "new", "leaf": "NA", "complete": true}
+{"type": "edge", "old": "OE", "new": "NE", "approved": false}
+{"type": "completeness", "side": "old", "leaf": "OA", "complete": true}
+{"type": "edge", "old": "OA", "new": "NA", "approved": true}
+{"type": "completeness", "side": "old", "leaf": "OC", "complete": false}
+{"type": "completeness", "side": "new", "leaf": "NC", "complete": true}
+{"type": "edge", "old": "OC", "new": "NC", "approved": true}
+{"type": "completeness", "side": "old", "leaf": "OB", "complete": true}
+{"type": "completeness", "side": "new", "leaf": "ND", "complete": true}
+{"type": "completeness", "side": "old", "leaf": "OD", "complete": true}
+{"type": "completeness", "side": "new", "leaf": "NE", "complete": true}
+{"type": "completeness", "side": "old", "leaf": "OE", "complete": true}
